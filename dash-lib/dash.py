@@ -42,6 +42,9 @@ class Dash:
         self.counter = 0
         self.threshold = 100
         self.count = True
+        self.seen_first = False
+        self.mode = "dhcp"
+        self.iface=None
 
     def register(self, mac, func=None, name="Dash Button"):
         '''Register all MAC addresses you want Dash to recognize and pass a function
@@ -52,6 +55,45 @@ class Dash:
         if not self.quiet:
             print "Registered function for MAC address '%s' (name: '%s')" % (mac, name)
 
+    def dhcp_detect(self, packet):
+        '''
+        scapy callback on captured packets. Will check the packet's source MAC address.
+        If that MAC is recognized, the function mapped to it will be executed.
+        '''
+
+        if not self.quiet:
+            print "Detected DHCP request from %s" % packet.src
+
+        if self.count is True:
+            self.counter += 1
+
+        # If enough packets have arrived, issue a message
+        if self.counter % self.threshold == 0:
+            if not self.quiet:
+                print "Recorded %d DHCP requests so far" % self.counter
+
+        # If the sender's MAC address is mapped and there's actually something mapped to it...
+        if packet.src in self.macs and self.macs[packet.src] is not None:
+            # Get the function mapped to the address
+            func = self.macs[packet.src][0]
+            # Get the name associated with it
+            name = self.macs[packet.src][1]
+            if not self.quiet:
+                print "MAC address '%s' is mapped to '%s'" % (packet.src, name)
+            if func is not None:
+                # Call function
+                pkt_id = packet.id
+
+                if pkt_id == 1:
+                    self.seen_first = True
+                    return
+                elif pkt_id == 2:
+                    if self.seen_first:
+                        # This is it!
+                        self.seen_first = False
+                        func()
+         
+
     def arp_detect(self, packet):
         '''
         scapy callback on each captured package. Will analyze the packet's origin
@@ -59,6 +101,10 @@ class Dash:
         If the address is found in the map, the mapped function will be called.
         '''
         sender_mac = packet.hwsrc
+        target_mac = packet.hwdst
+
+        if not self.quiet:
+            print "Detected ARP request from %s to %s" % (sender_mac, target_mac)
 
         if self.count is True:
             self.counter += 1
@@ -84,6 +130,20 @@ class Dash:
         '''
         Starts the Dash service (by starting the scapy sniff process).
         '''
+        if self.mode is None:
+            print "Warning: No mode set, falling back to 'dhcp'"
+            self.mode = "dhcp"
+
         if not self.quiet:
-            print "Starting Dash...waiting for ARP packages to arrive"
-        sniff(prn=self.arp_detect, filter="arp", store=0)
+            if self.iface is None:
+                print "Starting Dash (all interfaces, mode: %s)" % self.mode
+            else:
+                print "Starting Dash (%s, mode: %s)" % (self.iface, self.mode)
+
+        if self.mode is not None:
+            if self.mode is "dhcp":
+                sniff(iface=self.iface, filter="udp and (port 67 or 68)", prn=self.dhcp_detect, store=0)
+            elif self.mode is "arp":
+                sniff(iface=self.iface, prn=self.arp_detect, filter="arp", store=0)
+            else:
+                print "Error: unrecognized mode '%s', use 'dhcp' or 'arp'" % mode

@@ -31,6 +31,8 @@ dash = Dash()
 
 # Make it quiet
 dash.quiet = False
+dash.mode = "dhcp"	# or 'arp' if you own an older button
+dash.iface = "en1"	# or None for all interfaces
 
 # The callback we will assign to the MAC address associated with the Dash Button
 # we'll use as a doorbell
@@ -42,10 +44,18 @@ def doorbellCallback():
 def livingRoomLightCallback():
     print "Toggle living room lights"
 
+# Just one more callback :)
+def button():
+	print "Dash button recognized!"
 
-# Replace "xx:xx:xx:xx:xx:xx" and "yy:yy:yy:yy:yy:yy" with your Dash Buttons' actual MAC addresses
+
+'''
+ Replace "xx:xx:xx:xx:xx:xx", "yy:yy:yy:yy:yy:yy" and "zz:zz:zz:zz:zz:zz" with 
+ your Dash Buttons' actual MAC addresses. Make sure to use lower case letters!
+'''
 dash.register("xx:xx:xx:xx:xx:xx", func=doorbellCallback, name="Doorbell")
 dash.register("yy:yy:yy:yy:yy:yy", func=livingRoomLightCallback, name="Living room lights")
+dash.register("zz:zz:zz:zz:zz:zz", func=button, name="Dashbutton")
 
 # Start Dash (requires root)
 dash.start()
