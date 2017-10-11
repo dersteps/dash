@@ -31,7 +31,7 @@ dash = Dash()
 
 # Make it quiet
 dash.quiet = False
-dash.mode = "dhcp"	# or 'arp' if you own an older button
+dash.mode = "dhcp"	# 'arp', 'dhcp' or 'discover'
 dash.iface = "en1"	# or None for all interfaces
 
 # The callback we will assign to the MAC address associated with the Dash Button
@@ -52,6 +52,8 @@ def button():
 '''
  Replace "xx:xx:xx:xx:xx:xx", "yy:yy:yy:yy:yy:yy" and "zz:zz:zz:zz:zz:zz" with 
  your Dash Buttons' actual MAC addresses. Make sure to use lower case letters!
+
+ If you don't know your Dash Button's MAC address yet, try discover mode
 '''
 dash.register("xx:xx:xx:xx:xx:xx", func=doorbellCallback, name="Doorbell")
 dash.register("yy:yy:yy:yy:yy:yy", func=livingRoomLightCallback, name="Living room lights")

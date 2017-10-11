@@ -25,6 +25,7 @@ SOFTWARE.
 
 # Make sure scapy is installed!
 from scapy.all import *
+from pprint import pprint
 
 class Dash:
     '''
@@ -40,11 +41,16 @@ class Dash:
         self.macs = {}
         self.quiet = True
         self.counter = 0
-        self.threshold = 100
+        self.threshold = 10
         self.count = True
         self.seen_first = False
         self.mode = "dhcp"
         self.iface=None
+        self.discovered = {}
+        self.amazon_ouis = [
+            "F0D2F1", "F0272D", "AC63BE", "A002DC", "94BA31", "8871E5", "8841C1", "84D6D0", "74C246", "747548", "70B3D5", "6854FD", 
+            "5CC9D3", "50F5DA", "50B363", "44650D", "34D270", "0C47C9", "001A90"
+        ]
 
     def register(self, mac, func=None, name="Dash Button"):
         '''Register all MAC addresses you want Dash to recognize and pass a function
@@ -126,6 +132,33 @@ class Dash:
                 # Call function
                 func()
 
+    def amazon_mac(self, oui):
+        if "".join(oui[0:8].split(":")).upper() in self.amazon_ouis:
+            return True
+        return False
+
+    def discover_stop_filter(self, packet):
+        if self.counter >= self.threshold:
+            for oui in self.discovered.keys():
+                if self.amazon_mac(oui):
+                    print "Likely a Dash button, or other Amazon device: %s" % oui 
+            return True
+        return False
+
+
+    def discover(self, packet):
+        self.counter += 1
+        if not packet.src in self.discovered:
+            self.discovered[packet.src] = 0
+            amazon = self.amazon_mac(packet.src)
+            add = "non-Amazon MAC"
+            if amazon:
+                add = "Amazon MAC"
+            print "Discovered MAC '%s' (%s)" % (packet.src, add)
+        self.discovered[packet.src] += 1
+        out = "\r"
+        
+
     def start(self):
         '''
         Starts the Dash service (by starting the scapy sniff process).
@@ -145,5 +178,8 @@ class Dash:
                 sniff(iface=self.iface, filter="udp and (port 67 or 68)", prn=self.dhcp_detect, store=0)
             elif self.mode is "arp":
                 sniff(iface=self.iface, prn=self.arp_detect, filter="arp", store=0)
+            elif self.mode is "discover":
+                print "Will listen until %d packets (set via dash.threshold) are captured" % self.threshold
+                sniff(iface=self.iface, prn=self.discover, filter="arp or (udp and (port 67 or 68))", store=0, stop_filter=self.discover_stop_filter)
             else:
                 print "Error: unrecognized mode '%s', use 'dhcp' or 'arp'" % mode
